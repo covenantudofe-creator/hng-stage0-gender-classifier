@@ -4,12 +4,10 @@ const cors = require("cors");
 
 const app = express();
 
-// CORS
 app.use(cors());
 
-/* =========================
-   ROUTE
-========================= */
+const PORT = process.env.PORT || 3000;
+
 app.get("/api/classify", async (req, res) => {
   try {
     const { name } = req.query;
@@ -17,14 +15,7 @@ app.get("/api/classify", async (req, res) => {
     if (!name) {
       return res.status(400).json({
         status: "error",
-        message: "Name parameter is required",
-      });
-    }
-
-    if (typeof name !== "string") {
-      return res.status(422).json({
-        status: "error",
-        message: "Name must be a string",
+        message: "name parameter is required",
       });
     }
 
@@ -34,32 +25,38 @@ app.get("/api/classify", async (req, res) => {
 
     const data = response.data;
 
-    const result = {
-      name: data.name,
-      gender: data.gender,
-      probability: data.probability,
-      sample_size: data.count,
-      is_confident: data.probability > 0.8,
-      processed_at: new Date().toISOString(),
-    };
+    if (!data.gender || data.count === 0) {
+      return res.status(404).json({
+        status: "error",
+        message: "No prediction available for the provided name",
+      });
+    }
+
+    const sample_size = data.count;
+    const probability = data.probability;
+
+    const is_confident =
+      probability >= 0.7 && sample_size >= 100;
 
     return res.status(200).json({
       status: "success",
-      data: result,
+      data: {
+        name: data.name,
+        gender: data.gender,
+        probability,
+        sample_size,
+        is_confident,
+        processed_at: new Date().toISOString(),
+      },
     });
 
   } catch (error) {
     return res.status(500).json({
       status: "error",
-      message: "Server error or external API failed",
+      message: "Server or upstream failure",
     });
   }
 });
-
-/* =========================
-   SERVER START
-========================= */
-const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
